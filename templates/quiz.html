@@ -5,47 +5,86 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css">
     <title>Django Quiz App</title>
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        h1, h3 {
+            color: #343a40;
+        }
+        .quiz-container {
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .answer-label {
+            margin-left: 10px;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            border: none;
+        }
+        .btn-primary:disabled {
+            background-color: #007bff;
+            opacity: 0.6;
+        }
+    </style>
 </head>
 <body>
-    <div id="app">
-        <div class="container mt-5 pt-5">
-            <div class="col-md-6 mx-auto">
-                <h3>Give Quiz</h3>
+    <div id="app" class="container mt-5 pt-5">
+        <div class="quiz-container col-md-8 mx-auto">
+            <h3 class="text-center">Give Quiz</h3>
 
-                <!-- Quiz Content -->
-                <div v-if="loading">
-                    Loading quiz...
+            <!-- Quiz Content -->
+            <div v-if="loading" class="text-center">
+                <p>Loading quiz...</p>
+            </div>
+            <div v-else>
+                <div v-if="!quizCompleted">
+                    <!-- Show current question and answers -->
+                    <div v-if="currentQuestion < questions.length">
+                        <p><strong>Question [[ currentQuestion + 1 ]] :</strong> [[ questions[currentQuestion].question ]]</p>
+                        <div v-for="(answer, index) in questions[currentQuestion].answer" :key="index">
+                            <input 
+                                @change="selectAnswer($event, questions[currentQuestion].uid)" 
+                                :value="answer.answer" 
+                                type="radio" 
+                                :name="'question_' + currentQuestion"
+                                id="answer_[[ index ]]"
+                                :checked="selectedAnswer === answer.answer">
+                            <label class="answer-label" :for="'answer_' + index">[[ answer.answer ]]</label>
+                        </div>
+                        <!-- Next button -->
+                        <button 
+                            :disabled="!nextButtonEnabled" 
+                            @click="nextQuestion" 
+                            class="btn btn-primary mt-3">
+                            Next
+                        </button>
+                        <button @click="goToMainPage" class="btn btn-danger mt-3 ml-3">Main Page</button>
+                    </div>
                 </div>
                 <div v-else>
-                    <div v-if="!quizCompleted">
-                        <!-- Show current question and answers -->
-                        <div v-if="currentQuestion < questions.length">
-                            <p>Question [[ currentQuestion + 1 ]]: [[ questions[currentQuestion].question ]]</p>
-                            <div v-for="answer in questions[currentQuestion].answer" :key="answer.answer">
-                                <input 
-                                    @change="selectAnswer($event, questions[currentQuestion].uid)" 
-                                    :value="answer.answer" 
-                                    type="radio" 
-                                    :name="'question_' + currentQuestion">
-                                <label>[[ answer.answer ]]</label>
-                            </div>
-                            <!-- Next button -->
-                            <button 
-                                :disabled="!nextButtonEnabled" 
-                                @click="nextQuestion" 
-                                class="btn btn-primary mt-3">
-                                Next
-                            </button>
-                        </div>
-                    </div>
-                    <div v-else>
-                        <!-- Show result after quiz is completed -->
-                        <h3>Quiz Completed!</h3>
-                        <p>You answered [[ correctAnswers ]] out of [[ questions.length ]] questions correctly.</p>
-                        <button @click="restartQuiz" class="btn btn-primary">Restart Quiz</button>
-                    </div>
+                    <!-- Show result after quiz is completed -->
+                    <h3 class="text-center">Quiz Completed!</h3>
+                    <p class="text-center">You answered [[ correctAnswers ]] out of [[ questions.length ]] questions correctly.</p>
+
+                    <h4 class="text-center">Your Answers:</h4>
+                    <ul class="list-group">
+                        <li class="list-group-item" v-for="(answer, index) in userAnswers" :key="index">
+                            <strong>Question [[ index + 1 ]] :</strong> [[ questions[index].question ]] <br>
+                            Your Answer: [[ answer.selectedAnswer ]] <br>
+                            Correct Answer: [[ questions[index].answer.find(a => a.is_correct).answer ]]
+                            <span v-if="answer.isCorrect" class="text-success">(Correct)</span>
+                            <span v-else class="text-danger">(Incorrect)</span>
+                        </li>
+                    </ul>
+
+                    <button @click="restartQuiz" class="btn btn-primary mx-auto d-block">Restart Quiz</button>
+                    <button @click="goToMainPage" class="btn btn-danger mt-3 mx-auto d-block">Main Page</button>
                 </div>
-                
             </div>
         </div>
     </div>
@@ -68,13 +107,11 @@
                 }
             },
             mounted() {
-                console.log("Vue app mounted");
                 this.fetchQuestions(); 
             },
             methods: {
                 fetchQuestions() {
                     const gfg = new URLSearchParams(window.location.search).get('gfg');
-                    console.log(`Fetching questions for: ${gfg}`);
                     fetch(`/get_quiz/?gfg=${gfg}`)
                         .then(response => {
                             if (!response.ok) {
@@ -83,10 +120,8 @@
                             return response.json();
                         })
                         .then(data => {
-                            console.log("Fetched data:", data); 
                             if (data.status) {
                                 this.questions = data.data;
-                                console.log("Questions loaded:", this.questions);  // Log loaded questions
                             } else {
                                 alert("Failed to load questions");
                             }
@@ -103,21 +138,21 @@
                 },
                 nextQuestion() {
                     const correctAnswer = this.questions[this.currentQuestion].answer.find(a => a.is_correct).answer;
-    
+
                     this.userAnswers.push({
                         questionId: this.questions[this.currentQuestion].uid,
                         selectedAnswer: this.selectedAnswer,
                         isCorrect: this.selectedAnswer === correctAnswer
                     });
-    
+
                     if (this.selectedAnswer === correctAnswer) {
                         this.correctAnswers++;
                     }
-    
+
                     if (this.currentQuestion < this.questions.length - 1) {
                         this.currentQuestion++;
-                        this.selectedAnswer = null;  
-                        this.nextButtonEnabled = false;  
+                        this.selectedAnswer = null;  // Reset the selected answer
+                        this.nextButtonEnabled = false;  // Disable the next button until a new answer is selected
                     } else {
                         this.quizCompleted = true;
                     }
@@ -129,10 +164,12 @@
                     this.quizCompleted = false;
                     this.selectedAnswer = null;
                     this.nextButtonEnabled = false;
+                },
+                goToMainPage() {
+                    window.location.href = "/"; // Redirect to main page
                 }
             }
         }).mount('#app');
     </script>
-    
 </body>
 </html>
