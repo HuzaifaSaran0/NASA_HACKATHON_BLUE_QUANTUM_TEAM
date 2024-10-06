@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css">
+    <title>Django Quiz App</title>
+</head>
+<body>
+    <div id="app">
+        <div class="container mt-5 pt-5">
+            <div class="col-md-6 mx-auto">
+                <h3>Give Quiz</h3>
+
+                <!-- Quiz Content -->
+                <div v-if="loading">
+                    Loading quiz...
+                </div>
+                <div v-else>
+                    <div v-if="!quizCompleted">
+                        <!-- Show current question and answers -->
+                        <div v-if="currentQuestion < questions.length">
+                            <p>Question [[ currentQuestion + 1 ]]: [[ questions[currentQuestion].question ]]</p>
+                            <div v-for="answer in questions[currentQuestion].answer" :key="answer.answer">
+                                <input 
+                                    @change="selectAnswer($event, questions[currentQuestion].uid)" 
+                                    :value="answer.answer" 
+                                    type="radio" 
+                                    :name="'question_' + currentQuestion">
+                                <label>[[ answer.answer ]]</label>
+                            </div>
+                            <!-- Next button -->
+                            <button 
+                                :disabled="!nextButtonEnabled" 
+                                @click="nextQuestion" 
+                                class="btn btn-primary mt-3">
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                    <div v-else>
+                        <!-- Show result after quiz is completed -->
+                        <h3>Quiz Completed!</h3>
+                        <p>You answered [[ correctAnswers ]] out of [[ questions.length ]] questions correctly.</p>
+                        <button @click="restartQuiz" class="btn btn-primary">Restart Quiz</button>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+
+    <!-- Vue.js Script -->
+    <script src="https://unpkg.com/vue@3.0.0-rc.5/dist/vue.global.prod.js"></script>
+    <script>
+        const app = Vue.createApp({
+            delimiters: ['[[', ']]'],  
+            data() {
+                return {
+                    currentQuestion: 0,
+                    questions: [],
+                    userAnswers: [],
+                    correctAnswers: 0,
+                    selectedAnswer: null,
+                    quizCompleted: false,
+                    loading: true,
+                    nextButtonEnabled: false 
+                }
+            },
+            mounted() {
+                console.log("Vue app mounted");
+                this.fetchQuestions(); 
+            },
+            methods: {
+                fetchQuestions() {
+                    const gfg = new URLSearchParams(window.location.search).get('gfg');
+                    console.log(`Fetching questions for: ${gfg}`);
+                    fetch(`/get_quiz/?gfg=${gfg}`)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            console.log("Fetched data:", data); 
+                            if (data.status) {
+                                this.questions = data.data;
+                                console.log("Questions loaded:", this.questions);  // Log loaded questions
+                            } else {
+                                alert("Failed to load questions");
+                            }
+                            this.loading = false;
+                        })
+                        .catch(error => {
+                            console.error("Error fetching quiz:", error);
+                            this.loading = false;
+                        });
+                },
+                selectAnswer(event, questionId) {
+                    this.selectedAnswer = event.target.value;
+                    this.nextButtonEnabled = true; 
+                },
+                nextQuestion() {
+                    const correctAnswer = this.questions[this.currentQuestion].answer.find(a => a.is_correct).answer;
+    
+                    this.userAnswers.push({
+                        questionId: this.questions[this.currentQuestion].uid,
+                        selectedAnswer: this.selectedAnswer,
+                        isCorrect: this.selectedAnswer === correctAnswer
+                    });
+    
+                    if (this.selectedAnswer === correctAnswer) {
+                        this.correctAnswers++;
+                    }
+    
+                    if (this.currentQuestion < this.questions.length - 1) {
+                        this.currentQuestion++;
+                        this.selectedAnswer = null;  
+                        this.nextButtonEnabled = false;  
+                    } else {
+                        this.quizCompleted = true;
+                    }
+                },
+                restartQuiz() {
+                    this.currentQuestion = 0;
+                    this.userAnswers = [];
+                    this.correctAnswers = 0;
+                    this.quizCompleted = false;
+                    this.selectedAnswer = null;
+                    this.nextButtonEnabled = false;
+                }
+            }
+        }).mount('#app');
+    </script>
+    
+</body>
+</html>
